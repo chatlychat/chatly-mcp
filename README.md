@@ -1,7 +1,7 @@
 # @chatlychat/mcp
 
 The Chatly [Model Context Protocol](https://modelcontextprotocol.io) server:
-49 typed tools over stdio or a remote HTTP endpoint.
+78 typed tools over stdio or a remote HTTP endpoint — 71 reads and 7 writes.
 
 Full documentation, including the tool list and the permission model, is at
 [chatlychat.com/docs/api-mcp](https://chatlychat.com/docs/api-mcp). The source

@@ -3,6 +3,15 @@
  *
  * `send_message` is the only mutating one, and it is the whole point of the
  * server — everything else here exists so a model can read before it writes.
+ *
+ * The four other key-accessible writes on this surface are deliberately not
+ * tools. `POST :id/scheduled-messages` is `send_message` with a timer, and a
+ * message a human cannot see yet is one nobody will catch before the
+ * customer does; `DELETE scheduled-messages/:id` silently unsends a
+ * colleague's planned reply; `PUT :id/agent-handling` takes a thread off
+ * whoever has it, or drops one mid-conversation; `POST
+ * :id/generated-replies` spends the workspace's AI budget per call. Every
+ * one of them is reachable with an API key by an integrator who meant it.
  */
 import { z } from 'zod';
 
@@ -67,6 +76,48 @@ export const CONVERSATION_TOOLS: readonly ToolDefinition[] = [
     mutating: false,
     run: (ctx, args) =>
       call(ctx, 'GET', `/v1/conversations/${String(args['conversationId'])}/linked`),
+  },
+  {
+    name: 'get_unread_counts',
+    title: 'The inbox badges',
+    description:
+      'Unread totals for this credential — overall, and bucketed per inbox, team and label. The fastest read of "where is the backlog": one call, no listing. It is scoped to what this credential may open, so a number here is a number the caller could act on.',
+    inputSchema: z.object({
+      brand: z.string().uuid().optional().describe('Narrow to one brand.'),
+    }),
+    mutating: false,
+    run: (ctx, args) =>
+      call(ctx, 'GET', '/v1/conversations/unread-counts', { query: { brand: args['brand'] } }),
+  },
+  {
+    name: 'get_scheduled_messages',
+    title: 'Sends queued on this thread',
+    description:
+      'Messages an agent queued to go out later, with their send times. ALWAYS check this before replying: the customer has not seen these yet, and answering the same point again — or contradicting it — is the failure this tool exists to prevent. Cancelling one is not available here; ask a human.',
+    inputSchema: z.object({ conversationId: z.string().uuid() }),
+    mutating: false,
+    run: (ctx, args) =>
+      call(ctx, 'GET', `/v1/conversations/${String(args['conversationId'])}/scheduled-messages`),
+  },
+  {
+    name: 'get_generated_replies',
+    title: 'AI-drafted replies awaiting a human',
+    description:
+      'Replies an AI agent proposed on this thread, pending or recently decided, with who edited or discarded them and why. Read it to see whether a draft is already waiting rather than writing a second one, and to learn how this workspace rewrites drafts before they go out.',
+    inputSchema: z.object({ conversationId: z.string().uuid() }),
+    mutating: false,
+    run: (ctx, args) =>
+      call(ctx, 'GET', `/v1/conversations/${String(args['conversationId'])}/generated-replies`),
+  },
+  {
+    name: 'get_agent_handling',
+    title: 'Who is working this thread',
+    description:
+      'Whether a BYO agent has claimed this conversation, which one, and when — `handling` is null when nobody has. Check it before replying: another agent holding the thread means your reply arrives on top of theirs. Claiming or releasing a thread is a write and is not exposed.',
+    inputSchema: z.object({ conversationId: z.string().uuid() }),
+    mutating: false,
+    run: (ctx, args) =>
+      call(ctx, 'GET', `/v1/conversations/${String(args['conversationId'])}/agent-handling`),
   },
   {
     name: 'send_message',

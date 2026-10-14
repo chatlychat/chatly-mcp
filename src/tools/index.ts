@@ -17,11 +17,14 @@
  */
 export { call, listQuery, type ApiContext, type ToolDefinition } from './call.js';
 
+import { BILLING_TOOLS } from './billing.js';
+import { BOT_TOOLS } from './bots.js';
 import { CONTACT_TOOLS } from './contacts.js';
 import { CONVERSATION_TOOLS } from './conversations.js';
 import { KNOWLEDGE_TOOLS } from './knowledge.js';
 import { REPORT_TOOLS } from './reports.js';
 import { TICKET_TOOLS } from './tickets.js';
+import { WEBHOOK_TOOLS } from './webhooks.js';
 import { WORKSPACE_TOOLS } from './workspace.js';
 
 import type { ToolDefinition } from './call.js';
@@ -35,6 +38,9 @@ export const TOOLS: readonly ToolDefinition[] = [
   ...TICKET_TOOLS,
   ...WORKSPACE_TOOLS,
   ...REPORT_TOOLS,
+  ...BILLING_TOOLS,
+  ...WEBHOOK_TOOLS,
+  ...BOT_TOOLS,
 ];
 
 /** Name → definition, for dispatch. */

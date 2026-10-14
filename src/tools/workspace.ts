@@ -2,6 +2,13 @@
  * What the workspace IS: its channels, inboxes, labels, macros, skills and
  * teams — plus `whoami`, which is the first thing to call when a tool fails
  * with a 403 and you need to know what this key can actually do.
+ *
+ * Reads only. Every write on this surface is configuration — a macro, a
+ * channel, a brand, a trigger — and a wrong one is not a bad answer in one
+ * conversation but a standing change to how the workspace behaves, applied
+ * to everybody, with nobody watching. `POST`/`PATCH`/`DELETE /v1/macros` and
+ * `PATCH /v1/channels/:id` are all key-accessible and all deliberately
+ * absent.
  */
 import { z } from 'zod';
 
@@ -42,6 +49,68 @@ export const WORKSPACE_TOOLS: readonly ToolDefinition[] = [
     inputSchema: z.object({}),
     mutating: false,
     run: (ctx) => call(ctx, 'GET', '/v1/labels'),
+  },
+  {
+    name: 'get_channel',
+    title: 'Read one channel',
+    description:
+      'One channel with its settings, as `list_channels` returns them but for a single id — including `originsRestricted`, which is what answers "why does the widget not load on their site". Credentials are redacted on this route exactly as on the list; there is no way to read a channel secret through MCP.',
+    inputSchema: z.object({ channelId: z.string().uuid() }),
+    mutating: false,
+    run: (ctx, args) => call(ctx, 'GET', `/v1/channels/${String(args['channelId'])}`),
+  },
+  {
+    name: 'get_workspace_settings',
+    title: 'Workspace settings',
+    description:
+      'The settings blob: business hours, privacy and retention choices, onboarding state, portal and widget preferences. Read it before telling anyone how their workspace behaves — most "why did it do that" questions are answered by a setting rather than by a bug.',
+    inputSchema: z.object({}),
+    mutating: false,
+    run: (ctx) => call(ctx, 'GET', '/v1/workspace/settings'),
+  },
+  {
+    name: 'list_macros',
+    title: 'The workspace macro library',
+    description:
+      'The macros this workspace has actually written — canned replies and conversation actions, ranked by how much they are used. Prefer wording from here over inventing your own: it is the voice the customer already hears. Distinct from `list_macro_templates`, which is the catalogue of macros they could install but have not. Answers a BARE ARRAY, not a page, capped at 200 rows.',
+    inputSchema: z.object({
+      query: z.string().max(120).optional().describe('Substring match on name or body.'),
+      scope: z.enum(['workspace', 'team', 'personal']).optional(),
+      team: z.string().uuid().optional().describe('Only macros scoped to this team.'),
+      language: z
+        .string()
+        .max(8)
+        .optional()
+        .describe('Ranks macros in this language first. Does not filter.'),
+    }),
+    mutating: false,
+    run: (ctx, args) =>
+      call(ctx, 'GET', '/v1/macros', {
+        query: {
+          query: args['query'],
+          scope: args['scope'],
+          team: args['team'],
+          language: args['language'],
+        },
+      }),
+  },
+  {
+    name: 'get_macro',
+    title: 'Read one macro',
+    description:
+      'One macro’s full body, short code and actions, by id. Read it before describing what applying it would do — the actions are what change the conversation, not the text.',
+    inputSchema: z.object({ macroId: z.string().uuid() }),
+    mutating: false,
+    run: (ctx, args) => call(ctx, 'GET', `/v1/macros/${String(args['macroId'])}`),
+  },
+  {
+    name: 'list_api_key_scopes',
+    title: 'Every scope a key can hold',
+    description:
+      'The static vocabulary of API-key permissions, grouped by prefix. Pair it with `whoami` when a tool 403s: `whoami` says what this credential holds, this says what it could have been granted, and the difference is the answer to give the customer.',
+    inputSchema: z.object({}),
+    mutating: false,
+    run: (ctx) => call(ctx, 'GET', '/v1/api-keys/scopes'),
   },
   {
     name: 'list_macro_templates',

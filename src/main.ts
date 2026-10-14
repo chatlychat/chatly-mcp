@@ -36,7 +36,7 @@ const envSchema = z.object({
    * Required for stdio and ignored for HTTP.
    *
    * Not `.optional()` with a runtime branch, because the failure it prevents
-   * is a stdio server that starts, advertises 49 tools and 401s on every one
+   * is a stdio server that starts, advertises every tool and 401s on every one
    * of them. The HTTP path parses its own narrower schema below.
    */
   CHATLY_API_KEY: z.string().min(10, 'CHATLY_API_KEY is required').optional(),

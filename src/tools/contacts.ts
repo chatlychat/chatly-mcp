@@ -114,12 +114,21 @@ export const CONTACT_TOOLS: readonly ToolDefinition[] = [
     description: 'Removes one tag. The tag itself stays in the workspace registry.',
     inputSchema: z.object({ contactId: z.string().uuid(), tag: z.string().min(1).max(64) }),
     mutating: true,
-    run: (ctx, args) =>
-      call(
-        ctx,
-        'DELETE',
-        `/v1/contacts/${String(args['contactId'])}/tags/${encodeURIComponent(String(args['tag']))}`,
-      ),
+    /*
+     * The tag is encoded into a local before the call rather than inline, so
+     * that `call(ctx, 'DELETE', …)` fits on ONE line.
+     *
+     * That is a formatting detail with consequences: every reader of this
+     * directory is a text parser, and `scripts/audit/surface-parity.mjs`
+     * matches the call on a single line. Inline, prettier wrapped this into
+     * five, the audit could not see it, and the four-way parity report listed
+     * `contacts.remove_tag` as a route the SDK has and MCP lacks — while this
+     * tool sat here calling it.
+     */
+    run: (ctx, args) => {
+      const tag = encodeURIComponent(String(args['tag']));
+      return call(ctx, 'DELETE', `/v1/contacts/${String(args['contactId'])}/tags/${tag}`);
+    },
   },
   {
     name: 'track_event',

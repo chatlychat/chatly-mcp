@@ -106,6 +106,24 @@ export const KNOWLEDGE_TOOLS: readonly ToolDefinition[] = [
     run: (ctx) => call(ctx, 'GET', '/v1/docs-sources'),
   },
   {
+    name: 'list_knowledge_gaps',
+    title: 'Questions the knowledge base cannot answer',
+    description:
+      'Questions customers asked that the KB had no answer for, most-asked first, with how often each came up. This is the one tool that says what to WRITE rather than what exists: `search_kb` tells you the workspace has nothing on a topic, this tells you how many people have already asked. Drafting an article from a gap is a write and is not exposed.',
+    inputSchema: z.object({
+      status: z
+        .enum(['open', 'drafted', 'resolved', 'dismissed'])
+        .optional()
+        .describe('Default is every status; `open` is the backlog.'),
+      limit: z.number().int().min(1).max(200).optional(),
+    }),
+    mutating: false,
+    run: (ctx, args) =>
+      call(ctx, 'GET', '/v1/knowledge-gaps', {
+        query: { status: args['status'], limit: args['limit'] },
+      }),
+  },
+  {
     name: 'sync_docs_source',
     title: 'Sync a documentation source now',
     description:
