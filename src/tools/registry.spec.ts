@@ -6,6 +6,9 @@
  * without the idempotency key this API requires and a host retry double-posts
  * to a real customer.
  */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { TOOLS, TOOLS_BY_NAME, type ApiContext, type ToolDefinition } from './index.js';
@@ -92,9 +95,13 @@ describe('tool registry', () => {
    * registry in `index.ts`, which shrinks `TOOLS` silently — every other
    * assertion here iterates `TOOLS`, so each one gets WEAKER as it shrinks
    * and none of them would notice.
+   *
+   * It read `78` until 2026-10-19, which was not the registry's size — it was
+   * the stale number out of the README, and the two were wrong together. See
+   * the advertised-counts block below, which is what now pins the real one.
    */
   it('still carries the whole registry', () => {
-    expect(TOOLS.length).toBeGreaterThanOrEqual(78);
+    expect(TOOLS.length).toBeGreaterThanOrEqual(80);
   });
 
   it('marks exactly the state-changing tools as mutating', () => {
@@ -189,5 +196,88 @@ describe('input validation', () => {
       schema.safeParse({ conversationId: '00000000-0000-7000-8000-000000000001', body: '' })
         .success,
     ).toBe(false);
+  });
+});
+
+/**
+ * ══ THE ADVERTISED COUNTS MUST BE THE REGISTRY'S OWN ══════════════════════
+ *
+ * Three places state how many tools this server has: `README.md`, the
+ * `description` in `package.json`, and the public docs. npm shows the first
+ * two ON THE SAME PAGE, and on 2026-10-19 they contradicted each other there:
+ * the description said "83 typed tools (76 reads, 7 writes)" and the README
+ * body said "78 typed tools — 71 reads and 7 writes".
+ *
+ * How that shipped is the lesson. `0.1.3` existed FOR this correction — its
+ * changelog entry says so, "description only; no code change" — but the
+ * README was still on 78 at the commit that set the version, and the fix
+ * landed in a later commit that was never published. So half the payload went
+ * out (the description, already correct at the version commit) and half did
+ * not, and the published page argued with itself for five days. A version
+ * bump is not a publish.
+ *
+ * The number nobody checked was also hiding in this very file: the floor above
+ * read `78`, copied from the README rather than measured, so the registry's
+ * real size of 83 was unasserted and the two stale numbers agreed with each
+ * other.
+ *
+ * So no count is written down here. Both are DERIVED from `TOOLS` and the
+ * prose is required to match, which means adding a tool fails this spec until
+ * the advertised numbers are updated — and there is no constant to edit
+ * without reading.
+ */
+describe('the advertised tool counts', () => {
+  const root = fileURLToPath(new URL('../../', import.meta.url));
+  const writes = TOOLS.filter((t) => t.mutating === true).length;
+  const reads = TOOLS.length - writes;
+
+  /**
+   * Pull [total, reads, writes] out of a "N typed tools … N reads … N writes"
+   * sentence. Two idioms are in play — the README's em-dashed prose and the
+   * description's parenthetical — so this reads the three numbers by their
+   * nouns rather than matching either sentence's punctuation.
+   *
+   * Returns null when any of the three is absent, and the callers assert on
+   * that: a reworded sentence must fail loudly. A matcher that quietly finds
+   * nothing and reports no mismatch is how the README got here.
+   */
+  function countsIn(text: string): [number, number, number] | null {
+    const total = /(\d+) typed tools/.exec(text);
+    const r = /(\d+) reads/.exec(text);
+    const w = /(\d+) writes/.exec(text);
+    if (total === null || r === null || w === null) {
+      return null;
+    }
+    return [Number(total[1]), Number(r[1]), Number(w[1])];
+  }
+
+  it('the extractor reads both idioms, and refuses a sentence it cannot parse', () => {
+    expect(countsIn('83 typed tools over stdio — 76 reads and 7 writes.')).toEqual([83, 76, 7]);
+    expect(countsIn('Chatly MCP server — 83 typed tools (76 reads, 7 writes) over stdio')).toEqual([
+      83, 76, 7,
+    ]);
+    // No counts at all, and a partial sentence: both must be null rather than
+    // a tuple with a guessed member.
+    expect(countsIn('The Chatly MCP server, for Claude and Cursor.')).toBeNull();
+    expect(countsIn('83 typed tools over stdio or a remote HTTP endpoint.')).toBeNull();
+  });
+
+  it('reads and writes account for every tool', () => {
+    expect(reads + writes).toBe(TOOLS.length);
+    expect(writes).toBeGreaterThan(0);
+    expect(reads).toBeGreaterThan(0);
+  });
+
+  it("README.md advertises the registry's own numbers", () => {
+    const got = countsIn(readFileSync(`${root}README.md`, 'utf8'));
+    expect(got).not.toBeNull();
+    expect(got).toEqual([TOOLS.length, reads, writes]);
+  });
+
+  it("package.json's description advertises the registry's own numbers", () => {
+    const pkg = JSON.parse(readFileSync(`${root}package.json`, 'utf8')) as { description: string };
+    const got = countsIn(pkg.description);
+    expect(got).not.toBeNull();
+    expect(got).toEqual([TOOLS.length, reads, writes]);
   });
 });

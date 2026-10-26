@@ -1,6 +1,6 @@
 {
   "name": "@chatlychat/mcp",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Chatly MCP server — 83 typed tools (76 reads, 7 writes) over stdio or Streamable HTTP, for Claude, Cursor and any MCP client.",
   "type": "module",
   "main": "dist/main.js",
@@ -9,6 +9,7 @@
   },
   "files": [
     "dist",
+    "!dist/**/*.spec.*",
     "README.md",
     "LICENSE"
   ],

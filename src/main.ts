@@ -27,6 +27,7 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 
+import { earlyExitOutput } from './cli-flags.js';
 import { createMcpHttpServer } from './http.js';
 import { createMcpServer } from './server.js';
 
@@ -50,6 +51,17 @@ function die(message: string): never {
 }
 
 async function main(): Promise<void> {
+  /*
+   * Before the env parse, and on stdout: this process exits immediately, so
+   * nothing is speaking MCP over stdout yet. The `die`-to-stderr rule is
+   * about the SERVER being live, which it never becomes on this path.
+   */
+  const early = earlyExitOutput(process.argv.slice(2));
+  if (early !== null) {
+    process.stdout.write(`${early}\n`);
+    return;
+  }
+
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
     die(parsed.error.issues.map((i) => i.message).join('; '));
